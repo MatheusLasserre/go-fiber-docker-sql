@@ -1,0 +1,188 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["referentialIntegrity"]
+}
+
+datasource db {
+  provider     = "mysql"
+  // NOTE: When using postgresql, mysql or sqlserver, uncomment the @db.Text annotations in model Account below
+  // Further reading:
+  // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
+  // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+model Example {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Necessary for Next auth
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model User {
+  id            String        @id @default(cuid())
+  name          String?
+  email         String?       @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  routines      Routine[]
+  routineModel  RoutineModel?
+
+  // Cazimi Only
+  courses       course_accesses[]
+  organizations organizations_members[]
+  password      String?
+}
+
+model organizations {
+  id      BigInt                    @id @default(autoincrement())
+  name    String
+  members organizations_members[]
+  courses courses[]
+  library organizations_libraries[]
+}
+
+model organizations_members {
+  id             BigInt        @id @default(autoincrement())
+  organizationId BigInt
+  organization   organizations @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model organizations_libraries {
+  id             BigInt        @id @default(autoincrement())
+  organizationId BigInt
+  organization   organizations @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  libraryId      Int
+
+  @@index([organizationId])
+}
+
+model course_accesses {
+  id       BigInt  @id @default(autoincrement())
+  userId   String
+  courseId BigInt
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course   courses @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([userId])
+}
+
+model courses {
+  id             BigInt            @id @default(autoincrement())
+  name           String
+  description    String            @default("") @db.Text
+  organizationId BigInt
+  organization   organizations     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  aulas          classes[]
+  users          course_accesses[]
+  enabled        Boolean           @default(true)
+  price          Float             @default(0)
+
+  @@index([organizationId])
+}
+
+model classes {
+  id         BigInt  @id @default(autoincrement())
+  name       String
+  link       String
+  position   Int
+  uploadedAt String
+  duration   String
+  courseId   BigInt
+  course     courses @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+}
+
+// Routine Tracker Below
+
+model Routine {
+  id        String     @id @default(cuid())
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  exercises Exercise[]
+
+  @@index([userId])
+}
+
+model RoutineModel {
+  id        String          @id @default(cuid())
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String          @unique
+  exercises ExerciseModel[]
+}
+
+model Exercise {
+  id        String  @id @default(cuid())
+  task      String
+  concluded Boolean @default(false)
+  routine   Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  routineId String
+  // routineModel   RoutineModel @relation(fields: [routineModelId], references: [id])
+  // routineModelId String
+
+  @@index([routineId])
+}
+
+model ExerciseModel {
+  id             String       @id @default(cuid())
+  task           String
+  concluded      Boolean      @default(false)
+  routineModel   RoutineModel @relation(fields: [routineModelId], references: [id], onDelete: Cascade)
+  routineModelId String
+
+  @@index([routineModelId])
+}
